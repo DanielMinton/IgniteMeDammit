@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    xUnit 2 with the VSTest runner (xunit.runner.visualstudio + Microsoft.NET.Test.Sdk), so the
+    hang-timeout flag the gate passes to dotnet test works. Exact versions pinned (ADR-017).
+    Tests never touch the real data root: every test that needs a disk folder creates one under
+    %TEMP% and deletes it. The shipped examples are copied next to the test assembly so the
+    "examples validate" test reads them from AppContext.BaseDirectory, never the current directory.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>OG_opossum_command.Core.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\OG_opossum_command.Core\OG_opossum_command.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\examples\workflows\**\*.json" Link="examples\workflows\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\examples\scripts\**\*" Link="examples\scripts\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\**\*" Link="fixtures\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The single-instance test starts the real Desktop exe in smoke-test mode (ADR-036). A net10.0 test project
+      cannot reference a net10.0-windows project, so the exe path is baked in at build time and the ProjectReference
+      (no assembly reference) only guarantees the exe is built before the tests run.
+    -->
+    <AssemblyMetadata Include="DesktopExePath" Value="$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\src\OG_opossum_command.Desktop\bin\$(Configuration)\net10.0-windows\OG_opossum_command.exe'))" />
+    <ProjectReference Include="..\..\src\OG_opossum_command.Desktop\OG_opossum_command.Desktop.csproj" ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" Private="false" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,339 @@
+﻿<Application x:Class="OG_opossum_command.Desktop.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dashboard="clr-namespace:OG_opossum_command.Desktop.Dashboard"
+             xmlns:history="clr-namespace:OG_opossum_command.Desktop.History"
+             xmlns:settings="clr-namespace:OG_opossum_command.Desktop.Settings"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+             xmlns:a11y="clr-namespace:OG_opossum_command.Desktop.Accessibility"
+             xmlns:fb="clr-namespace:OG_opossum_command.Desktop.Feedback"
+             xmlns:cue="clr-namespace:OG_opossum_command.Core.Feedback;assembly=OG_opossum_command.Core"
+             ThemeMode="System"
+             ShutdownMode="OnExplicitShutdown">
+    <!-- No StartupUri: Program.Main decides whether a window is shown at all. -->
+    <!-- ThemeMode="System": the built-in Windows 11 (Fluent) theme follows light, dark and high contrast (ADR-055).
+         Colours below come from the Fluent brushes. The text, card and fill brushes map to system colours under high
+         contrast; the Accent* brushes keep the user's accent even then, so they are used only for borders and badges,
+         never for text. -->
+    <Application.Resources>
+
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <!-- Font sizes: rewritten at startup and on settings change by Accessibility/FontScale (system message font). -->
+        <sys:Double x:Key="OgocBodySize">14</sys:Double>
+        <sys:Double x:Key="OgocSmallSize">12</sys:Double>
+        <sys:Double x:Key="OgocHeadingSize">13</sys:Double>
+        <sys:Double x:Key="OgocLargeSize">16</sys:Double>
+        <sys:Double x:Key="OgocTitleSize">20</sys:Double>
+        <sys:Double x:Key="OgocDisplaySize">28</sys:Double>
+        <!-- Not a font: the tile badge diameter, scaled with the text so its glyph always fits. -->
+        <sys:Double x:Key="OgocBadgeSize">36</sys:Double>
+
+        <!-- OgocBadgeFill and OgocGlowFill (accent gradients) are built in code by Accessibility/AccentBrushes (ADR-057). -->
+
+        <FontFamily x:Key="OgocIconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+        <FontFamily x:Key="OgocMonoFont">Cascadia Mono, Consolas</FontFamily>
+
+        <!-- Focus ring for list rows: inside the row so neighbours do not overlap it. -->
+        <Style x:Key="OgocItemFocusVisual">
+            <Setter Property="Control.Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Border BorderThickness="2"
+                                CornerRadius="4"
+                                BorderBrush="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"
+                                SnapsToDevicePixels="True" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ListViewItem" BasedOn="{StaticResource {x:Type ListViewItem}}">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource OgocItemFocusVisual}" />
+        </Style>
+
+        <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource OgocItemFocusVisual}" />
+        </Style>
+
+        <!-- Keyboard focus ring: a thick system highlight outline, outside the control. -->
+        <Style x:Key="OgocFocusVisual">
+            <Setter Property="Control.Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Border Margin="-3"
+                                BorderThickness="2"
+                                CornerRadius="7"
+                                BorderBrush="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"
+                                SnapsToDevicePixels="True" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Buttons: the Fluent button, with the app's focus ring, size and font scale. -->
+        <Style x:Key="OgocButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource OgocFocusVisual}" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="FontSize" Value="{DynamicResource OgocBodySize}" />
+            <Setter Property="a11y:Motion.Press" Value="True" />
+            <Setter Property="fb:UiFeedback.Cue" Value="{x:Static cue:SoundCue.Tap}" />
+        </Style>
+
+        <Style x:Key="OgocAccentButton" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource OgocFocusVisual}" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="FontSize" Value="{DynamicResource OgocBodySize}" />
+            <Setter Property="a11y:Motion.Press" Value="True" />
+            <Setter Property="fb:UiFeedback.Cue" Value="{x:Static cue:SoundCue.Tap}" />
+        </Style>
+
+
+        <Style x:Key="OgocCancel" TargetType="Button" BasedOn="{StaticResource OgocAccentButton}">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="MinWidth" Value="120" />
+            <Setter Property="MinHeight" Value="44" />
+        </Style>
+
+        <!-- Workflow tile (ADR-057): a card with an accent glow layer that fades in on hover, lifts, sinks on press and
+             springs back (Motion.Press), and plays the Start cue from the view model. The glow is a separate layer, so
+             no brush is ever animated; under high contrast it is removed and the border alone shows hover. -->
+        <Style x:Key="OgocTile" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource OgocFocusVisual}" />
+            <Setter Property="MinHeight" Value="104" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="FontSize" Value="{DynamicResource OgocBodySize}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="a11y:Motion.Press" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="Bd"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    SnapsToDevicePixels="True" />
+                            <Border x:Name="Glow"
+                                    Background="{DynamicResource OgocGlowFill}"
+                                    CornerRadius="10"
+                                    BorderThickness="1"
+                                    Opacity="0"
+                                    IsHitTestVisible="False"
+                                    BorderBrush="{DynamicResource AccentFillColorDefaultBrush}">
+                                </Border>
+                            <ContentPresenter Margin="16,14"
+                                              RecognizesAccessKey="True"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource CardBackgroundFillColorSecondaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
+                            </Trigger>
+                            <DataTrigger Binding="{Binding Path=(SystemParameters.HighContrast)}" Value="True">
+                                <Setter TargetName="Glow" Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding Path=(SystemParameters.HighContrast)}" Value="True" />
+                                    <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True" />
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" />
+                            </MultiDataTrigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.5" />
+                                <Setter Property="Opacity" Value="0.75" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Navigation rail item: selected item gets a tinted fill and an accent pill on the left. -->
+        <Style x:Key="OgocNavItem" TargetType="ButtonBase">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource OgocFocusVisual}" />
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="FontSize" Value="{DynamicResource OgocBodySize}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="a11y:Motion.Press" Value="True" />
+            <Setter Property="fb:UiFeedback.Cue" Value="{x:Static cue:SoundCue.Navigate}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ButtonBase">
+                        <Grid>
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="12,6">
+                                <ContentPresenter RecognizesAccessKey="True" VerticalAlignment="Center"
+                                                  HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+                            </Border>
+                            <Border x:Name="Pill" Width="3" Height="16" CornerRadius="1.5"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                    Background="{DynamicResource AccentFillColorDefaultBrush}"
+                                    a11y:Motion.Pop="True"
+                                    Visibility="Collapsed" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
+                            </Trigger>
+                            <Trigger Property="ToggleButton.IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                <Setter TargetName="Pill" Property="Visibility" Value="Visible" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="OgocIcon" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource OgocIconFont}" />
+            <Setter Property="FontSize" Value="{DynamicResource OgocLargeSize}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+        </Style>
+
+        <!-- Section card: one per dashboard and settings section. -->
+        <Style x:Key="OgocCard" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="16,14" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
+        <Style x:Key="OgocHeading" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="{DynamicResource OgocLargeSize}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <!-- Every section heading is reachable with Narrator's H key; a sub-section sets Level3 on itself. -->
+            <Setter Property="AutomationProperties.HeadingLevel" Value="Level2" />
+        </Style>
+
+        <Style x:Key="OgocCaption" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="{DynamicResource OgocSmallSize}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        </Style>
+
+        <Style x:Key="OgocList" TargetType="ListView" BasedOn="{StaticResource {x:Type ListView}}">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource OgocFocusVisual}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+
+        <!-- Display face for the greeting and the headline numbers; falls back to Segoe UI before Windows 11. -->
+        <FontFamily x:Key="OgocDisplayFont">Segoe UI Variable Display, Segoe UI</FontFamily>
+
+        <!-- Headline number card (ADR-057): label, big tabular number, one quiet line under it. -->
+        <Style x:Key="OgocStat" TargetType="Border" BasedOn="{StaticResource OgocCard}">
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="Padding" Value="16,12,16,12" />
+            <Setter Property="a11y:Motion.Entrance" Value="True" />
+        </Style>
+
+        <Style x:Key="OgocStatNumber" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource OgocDisplayFont}" />
+            <Setter Property="FontSize" Value="{DynamicResource OgocDisplaySize}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="Margin" Value="0,2,0,0" />
+            <!-- Shown until Motion.CountTo has a number. -->
+            <Setter Property="Text" Value="—" />
+        </Style>
+
+        <!-- A key cap, e.g. Ctrl+1 on a tile. Decoration: screen readers get the shortcut from the tile's name. -->
+        <Style x:Key="OgocKeycap" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1,1,1,2" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="6,1" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+        </Style>
+
+        <!-- Status chip for runs. The fill carries the colour; the text stays the primary text colour, so it reads in every theme. -->
+        <Style x:Key="OgocChip" TargetType="Border">
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="8,1,10,2" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="ok">
+                    <Setter Property="Background" Value="{DynamicResource SystemFillColorSuccessBackgroundBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="bad">
+                    <Setter Property="Background" Value="{DynamicResource SystemFillColorCriticalBackgroundBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="warn">
+                    <Setter Property="Background" Value="{DynamicResource SystemFillColorCautionBackgroundBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- The coloured dot inside a chip or beside a step. -->
+        <Style x:Key="OgocDot" TargetType="Ellipse">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="Height" Value="8" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Fill" Value="{DynamicResource ControlStrongStrokeColorDefaultBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="ok">
+                    <Setter Property="Fill" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="bad">
+                    <Setter Property="Fill" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="warn">
+                    <Setter Property="Fill" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="active">
+                    <Setter Property="Fill" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                    <Setter Property="a11y:Motion.Pulse" Value="True" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <DataTemplate DataType="{x:Type dashboard:DashboardViewModel}">
+            <dashboard:DashboardView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type history:HistoryViewModel}">
+            <history:HistoryView />
+        </DataTemplate>
+
+        <DataTemplate DataType="{x:Type settings:SettingsViewModel}">
+            <settings:SettingsView />
+        </DataTemplate>
+
+    </Application.Resources>
+</Application>
